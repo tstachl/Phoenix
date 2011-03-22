@@ -1,8 +1,13 @@
 #Phoenix
-Phoenix is an open source software to setup and manage servers. It offers
-to install and operate all necessery software for web server, mail server
-development and production environments. Documentation and downlods are
-available at http://phoenix.w3agency.net/
+Phoenix is an open source software to manage git repositories.
+
+At the moment Phoenix provides git repository management with a solid
+user management, additionally you can add deployment keys directly to
+repositories. Access to the repositories is provided over SSH but with
+the built in access control there is no need for shell accounts.
+
+The hook system allows to add all git provided hooks to the repository
+even though you might not need all of them.
 
 Phoenix is licensed under the MIT Licence
 (http://creativecommons.org/licenses/MIT/).
