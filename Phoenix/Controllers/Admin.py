@@ -112,8 +112,7 @@ class Admin(Console):
 
     def init(self):
         if Config.get("phoenix", "initialized") == "True":
-            print "Already initialized."
-            return
+            raise AdminException("Already initialized.")
         
         logging.info("Defining variables for init ...")
         user = self.args.git_user
@@ -128,6 +127,10 @@ class Admin(Console):
         username = self.args.admin_username
         sql = self.args.sql_connect or "sqlite:///%s" % path.join(Config.get("ABS_PATH"), "data/phoenix.db")
         
+        logging.info("Checking for permission to write the config file ...")
+        if not File.writePermission(Config.get("CONF_FILE")):
+            raise AdminException("You don't have permission to write the config file `%s' ..." % Config.get("CONF_FILE"))
+        
         if not SysUser.exists(self.args.git_user):
             logging.info("Creating user `%s' ... " % user)
             SysUser.create(user, base)
@@ -138,7 +141,11 @@ class Admin(Console):
         
         __import__("os").setgid(__import__("pwd").getpwnam(user).pw_gid)
         __import__("os").setuid(__import__("pwd").getpwnam(user).pw_uid)
-                
+        
+        logging.info("Checking for permission to write the config file as `%s' ...")
+        if not File.writePermission(Config.get("CONF_FILE")):
+            raise AdminException("You don't have permission to write the config file `%s' ..." % Config.get("CONF_FILE"))
+        
         logging.info("Saving SQL connection string `%s' ..." % sql)
         Config.set("phoenix", "sql_connect", sql)
         
@@ -168,6 +175,9 @@ class Admin(Console):
         name = self.args.name
         email = self.args.email
         
+        dummy = self._getUserByUsernameOrEmail(username, email)
+        
+        logging.info("Creating and saving the new user ...")
         user = User(username, email, name)
         user.save()
         
@@ -180,7 +190,7 @@ class Admin(Console):
         name = self.args.repository_name
         path = self.args.repository_path
         
-        user = self._getUserByUsernameOrEmail(username, email)
+        user = self._getUserByUsernameOrEmail(username, email, True)
         dummy = self._getRepositoryByNameOrPath(user, name, path)
 
         logging.info("Changing to the git user ...")
@@ -204,7 +214,7 @@ class Admin(Console):
         name = self.args.repository_name
         path = self.args.repository_path
         
-        user = self._getUserByUsernameOrEmail(username, email)
+        user = self._getUserByUsernameOrEmail(username, email, True)
         repo = self._getRepositoryByNameOrPath(user, name, path)
         
         logging.info("Save new key in database ...")
@@ -222,7 +232,7 @@ class Admin(Console):
         hook = self.args.hook
         command = self.args.command
         
-        user = self._getUserByUsernameOrEmail(username, email)
+        user = self._getUserByUsernameOrEmail(username, email, True)
         repo = self._getRepositoryByNameOrPath(user, name, path, True)
         
         logging.info("Save new hook in database ...")
@@ -235,7 +245,7 @@ class Admin(Console):
         email = self.args.email
         username = self.args.username
         
-        user = self._getUserByUsernameOrEmail(username, email)
+        user = self._getUserByUsernameOrEmail(username, email, True)
         
         logging.info("Removing the user from the database ...")
         user.delete()
@@ -249,7 +259,7 @@ class Admin(Console):
         name = self.args.repository_name
         path = self.args.repository_path
 
-        user = self._getUserByUsernameOrEmail(username, email)
+        user = self._getUserByUsernameOrEmail(username, email, True)
         repo = self._getRepositoryByNameOrPath(user, name, path, True)
         
         logging.info("Removing the repository ...")
@@ -287,6 +297,37 @@ class Admin(Console):
         
         print "Done."
         
+    def _getUserByUsernameOrEmail(self, username, email, must=False):        
+        logging.info("Trying to find the user by username or email ...")
+        user = None
+        if username:
+            user = UserMapper.findByUsername(username)
+        if email:
+            user = UserMapper.findByEmail(email)
+                
+        logging.info("Checking if we have a user ...")
+        if must and not user:
+            raise AdminException("The user can not be found (username: `%s', email: `%s')" % (username, email))
+        if not must and user:
+            raise AdminException("The user `%s' with email `%s' already exists." % (user.username, user.email))
+        
+        return user
+    
+    def _getRepositoryByNameOrPath(self, user, name, path, must=False):
+        repo = None
+        logging.info("Trying to find a repository by name or path ...")
+        if name:
+            repo = user.getRepositoryByName(name)
+        if path:
+            repo = user.getRepositoryByPath(path)
+            
+        if must and not repo:
+            raise AdminException("Repository with name `%s' or path `%s' can not be found." % (name, path))
+        elif not must and repo:
+            raise AdminException("The repository `%s' already exists." % repo.name)
+            
+        return repo
+        
     def _createDirectoryStructure(self, repo, tar, ssh):
         if not path.exists(repo):
             logging.info("Creating repository dir at `%s' ..." % repo)
@@ -308,34 +349,6 @@ class Admin(Console):
         else:
             logging.warning("The folder `%s' already exists." % ssh)
         Config.set("phoenix", "ssh_dir", ssh)
-        
-    def _getUserByUsernameOrEmail(self, username, email):        
-        logging.info("Trying to find the user by username or email ...")
-        if username:
-            user = UserMapper.findByUsername(username)
-        if email:
-            user = UserMapper.findByEmail(email)
-                
-        logging.info("Checking if we have a user ...")
-        if not user:
-            raise AdminException("The user can not be found (username: `%s', email: `%s')" % (username, email))
-        
-        return user
-    
-    def _getRepositoryByNameOrPath(self, user, name, path, must=False):
-        repo = None
-        logging.info("Trying to find a repository by name or path ...")
-        if name:
-            repo = user.getRepositoryByName(name)
-        if path:
-            repo = user.getRepositoryByPath(path)
-            
-        if must and not repo:
-            raise AdminException("Repository with name `%s' or path `%s' can not be found." % (name, path))
-        elif not must and repo:
-            raise AdminException("The repository `%s' already exists." % repo.name)
-            
-        return repo
 
     def _createDatabase(self):
         from sqlalchemy import MetaData, Table, Column, Integer, String

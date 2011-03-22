@@ -34,7 +34,7 @@
 from Phoenix import Exception
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE
-from traceback import format_exc
+from traceback import format_exc, print_exc
 
 """----------------------------------------------------------------------------
                                 Exception
@@ -65,7 +65,7 @@ class Console(object):
             print "    > sudo phoenix-admin init"
             print "To find out about all options type:"
             print "    > sudo phoenix-admin init --help"
-            return False
+            exit()
         
         try:
             p = Popen(["git", "--help"], stdout=PIPE)
@@ -75,11 +75,11 @@ class Console(object):
             print "Please install `git' first."
             print "On Ubuntu simply type:"
             print "    > sudo apt-get install git git-core"
-            return False
+            exit()
         
         try:
             getattr(self, self.args.action)()
         except:
-            logging.fatal(format_exc())
-            return False
+            logging.debug(format_exc())
+            print_exc(0)
         exit()

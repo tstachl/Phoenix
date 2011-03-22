@@ -43,13 +43,24 @@ class File():
         open(filename, "a").close()
         
     @classmethod
-    def appendToFile(cls, file, text):
-        open(file, "a").write(text + "\n")
+    def appendToFile(cls, filename, text):
+        f = open(filename, "a")
+        f.write(text + "\n")
+        f.close()
         
     @classmethod
-    def removeLine(cls, f, regex):
+    def removeLine(cls, filename, regex):
         lines = []
-        for line in file(f).readlines():
+        for line in file(filename).readlines():
             if not search(regex, line):
                 lines.append(line)
-        file(f, "w").writelines(lines)
+        file(filename, "w").writelines(lines)
+        
+    @classmethod
+    def writePermission(cls, filename):
+        try:
+            open(filename, "a").close()
+            return True
+        except:
+            pass
+        return False

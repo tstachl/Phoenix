@@ -61,17 +61,14 @@ class User(Base):
     
     def __init__(self, username, email, name=None):
         from Phoenix.Library import Validate
-        if Validate.username(username):
-            self.username = username
-        else:
+        if not Validate.username(username):
             raise UserException("Username `%s' is not valid." % username)
-        
-        self.name = name
-        
-        if Validate.email(email):
-            self.email = email
-        else:
+        if not Validate.email(email):
             raise UserException("Email `%s' is not valid." % email)
+            
+        self.username = username
+        self.email = email
+        self.name = name
         
     def __repr__(self):
         return "<User('%s', '%s', '%s'>" % (self.username, self.name, self.email)
