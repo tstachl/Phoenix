@@ -32,12 +32,12 @@
                                 Imports
 ----------------------------------------------------------------------------"""
 from Phoenix.Conf import Config, logging
-from Phoenix.Library import Console
+from Phoenix.Library import Console, Validate
 from Phoenix.Models import KeyMapper, UserMapper, RepositoryMapper
-from os.environ import get
 from socket import gethostname
 from subprocess import Popen
 from shlex import split
+import os
 
 """----------------------------------------------------------------------------
                                 Exception
@@ -53,8 +53,8 @@ class ClientException(Exception):
 ----------------------------------------------------------------------------"""
 class Client(Console):
     
-    def __init__(self):
-        if not __import__("os").getuid() == __import__("pwd").getpwnam(Config.get("phoenix", "user")).pw_uid:
+    def __init__(self):        
+        if not os.getuid() == __import__("pwd").getpwnam(Config.get("phoenix", "user")).pw_uid:
             raise ClientException("Only `%s' can run this script" % Config.get("phoenix", "user"))
         super(Client, self).__init__()
         
@@ -76,22 +76,21 @@ class Client(Console):
         userKey = key.getUser()
         repoKey = key.getRepository()
         
-        if not get("SSH_ORIGINAL_COMMAND"):
+        if not os.environ.get("SSH_ORIGINAL_COMMAND"):
             print "Hi %s!" % userKey.username
             print "You've successfully authenticated, but %s does not provide shell access." % Config.get("phoenix", "app_name", "Phoenix")
             print "Use the following command to clone a repository:"
             print "    > git clone git@%s:%s/repository.git" % (gethostname(), userKey.username)
             return False
         else:
-            command = get("SSH_ORIGINAL_COMMAND")
-            if command.find("git") == -1:
+            (command, path) = os.environ.get("SSH_ORIGINAL_COMMAND").replace("'", "").split()
+            if not Validate.gitcommand(command):
+                raise Exception(command)
                 print "Hi %s!" % userKey.username
                 print "You've successfully authenticated, but %s does not provide shell access." % Config.get("phoenix", "app_name", "Phoenix")
                 print "Use the following command to clone a repository:"
                 print "    > git clone git@%s:%s/repository.git" % (gethostname(), userKey.username)
                 return False
-            else:
-                (command, path) = command.replace("'", "").split()
             
         (username, repopath) = path.split("/")
         user = UserMapper.findByUsername(username)
@@ -105,16 +104,17 @@ class Client(Console):
             if repoKey.id == repo.id:
                 __import__("os").execvp("git", ["git", "shell", "-c", "%s '%s'" % (command, repo.getFullpath())])
             else:
-                logging.error("User `%s' tried to access repository `%s' ..." % (userKey.uid, repo.id))
+                logging.error("User `%s' tried to access repository `%s' ..." % (userKey.id, repo.id))
                 raise ClientException("You are not allowed in this repository!")
         else:
             if userKey.id == repo.uid:
                 __import__("os").execvp("git", ["git", "shell", "-c", "%s '%s'" % (command, repo.getFullpath())])
             else:
-                logging.error("User `%s' tried to access repository `%s' ..." % (userKey.uid, repo.id))
+                logging.error("User `%s' tried to access repository `%s' ..." % (userKey.id, repo.id))
                 raise ClientException("You are not allowed in this repository!")
     
-    def runhook(self):        
+    def runhook(self):   
+        logging.disable(logging.INFO)     
         logging.info("Defining hook, repo and arguments ...")
         repo = RepositoryMapper.findById(self.args.repository_id)
         arguments = " " + self.args.arguments if self.args.arguments else ""

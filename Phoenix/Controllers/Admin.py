@@ -126,7 +126,7 @@ class Admin(Console):
         email = self.args.admin_email
         name = self.args.admin_name
         username = self.args.admin_username
-        sql = self.args.sql_connect or "sqlite:///%s" % path.join(Config.get("ABS_PATH"), "data", "phoenix.db")
+        sql = self.args.sql_connect or "sqlite:///%s" % path.join(Config.get("ABS_PATH"), "data/phoenix.db")
         
         if not SysUser.exists(self.args.git_user):
             logging.info("Creating user `%s' ... " % user)
@@ -134,13 +134,15 @@ class Admin(Console):
             Config.set("phoenix", "user", user)
             Config.set("phoenix", "base", base)
         else:
-            raise Exception("The user `%s' already exists." % user)
+            raise AdminException("The user `%s' already exists." % user)
         
         __import__("os").setgid(__import__("pwd").getpwnam(user).pw_gid)
         __import__("os").setuid(__import__("pwd").getpwnam(user).pw_uid)
-        
+                
         logging.info("Saving SQL connection string `%s' ..." % sql)
         Config.set("phoenix", "sql_connect", sql)
+        
+        self._createDatabase()
             
         self._createDirectoryStructure(repo, tar, ssh)
 
@@ -176,7 +178,7 @@ class Admin(Console):
         username = self.args.username
         email = self.args.email
         name = self.args.repository_name
-        path = self.args.path
+        path = self.args.repository_path
         
         user = self._getUserByUsernameOrEmail(username, email)
         dummy = self._getRepositoryByNameOrPath(user, name, path)
@@ -203,10 +205,11 @@ class Admin(Console):
         path = self.args.repository_path
         
         user = self._getUserByUsernameOrEmail(username, email)
-        repo = self._getRepositoryByNameOrPath(user, name, path, True)
+        repo = self._getRepositoryByNameOrPath(user, name, path)
         
         logging.info("Save new key in database ...")
-        repo.createKey(key)
+        if repo: repo.createKey(key)
+        else: user.createKey(key)
         
         print "Done."
         
@@ -320,8 +323,7 @@ class Admin(Console):
         return user
     
     def _getRepositoryByNameOrPath(self, user, name, path, must=False):
-        path = None
-        
+        repo = None
         logging.info("Trying to find a repository by name or path ...")
         if name:
             repo = user.getRepositoryByName(name)
@@ -334,3 +336,32 @@ class Admin(Console):
             raise AdminException("The repository `%s' already exists." % repo.name)
             
         return repo
+
+    def _createDatabase(self):
+        from sqlalchemy import MetaData, Table, Column, Integer, String
+        metadata = MetaData()
+        Table("user", metadata,
+            Column("id", Integer, primary_key=True),
+            Column("username", String, nullable=False),
+            Column("name", String, nullable=True),
+            Column("email", String, nullable=False),
+        )
+        Table("repository", metadata,
+            Column("id", Integer, primary_key=True),
+            Column("uid", Integer, nullable=False),
+            Column("name", String, nullable=False),
+            Column("path", String, nullable=False),
+            Column("hash", String, nullable=False),
+        )
+        Table("key", metadata,
+            Column("id", Integer, primary_key=True),
+            Column("uid", Integer, nullable=False),
+            Column("rid", Integer),
+        )
+        Table("hook", metadata,
+            Column("id", Integer, primary_key=True),
+            Column("rid", Integer, nullable=False),
+            Column("hook", String, nullable=False),
+            Column("command", String, nullable=False),
+        )
+        metadata.create_all(Config.getEngine())

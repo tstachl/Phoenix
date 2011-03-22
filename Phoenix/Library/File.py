@@ -47,15 +47,9 @@ class File():
         open(file, "a").write(text + "\n")
         
     @classmethod
-    def removeLine(cls, file, regex):
-        f = open(file, "r")
-        lines = f.readlines()
-        f.close()
-        
-        for i in range(len(lines) - 1):
-            if search(regex, lines[i]):
-                del lines[i]
-        
-        f = open(file, "w")
-        f.writelines(lines)
-        f.close()
+    def removeLine(cls, f, regex):
+        lines = []
+        for line in file(f).readlines():
+            if not search(regex, line):
+                lines.append(line)
+        file(f, "w").writelines(lines)

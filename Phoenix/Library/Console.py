@@ -32,7 +32,6 @@
                                 Imports
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
-from Phoenix.Conf import Config, logging
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE
 from traceback import format_exc
@@ -54,6 +53,8 @@ class Console(object):
     args = None
     
     def __init__(self):
+        from Phoenix.Conf import Config, logging
+        
         parser = ArgumentParser()
         self.defineParser(parser)
         self.args = parser.parse_args()
@@ -81,4 +82,4 @@ class Console(object):
         except:
             logging.fatal(format_exc())
             return False
-        return True
+        exit()

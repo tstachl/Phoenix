@@ -60,25 +60,29 @@ class Validate(object):
 
     @classmethod
     def user(cls, uid):
-        if __import__("UserMapper").findById(uid):
+        from Phoenix.Models import UserMapper
+        if UserMapper.findById(uid):
             return True
         return False
 
     @classmethod
     def repository(cls, rid):
-        if __import__("RepositoryMapper").findById(rid):
+        from Phoenix.Models import RepositoryMapper
+        if RepositoryMapper.findById(rid):
             return True
         return False
     
     @classmethod
     def key(cls, kid):
-        if __import__("KeyMapper").findById(kid):
+        from Phoenix.Models import KeyMapper
+        if KeyMapper.findById(kid):
             return True
         return False
     
     @classmethod
     def hook(cls, hid):
-        if __import__("HookMapper").findById(hid):
+        from Phoenix.Models import HookMapper
+        if HookMapper.findById(hid):
             return True
         return False
 
@@ -87,5 +91,11 @@ class Validate(object):
         if name in ("applypatch-msg", "commit-msg", "post-commit", "post-receive",
                     "post-update", "pre-applypatch", "pre-commit",
                     "prepare-commit-msg", "pre-rebase", "update"):
+            return True
+        return False
+
+    @classmethod
+    def gitcommand(cls, command):
+        if command in ("git-upload-pack", "git-receive-pack"):
             return True
         return False

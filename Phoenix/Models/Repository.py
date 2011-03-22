@@ -33,9 +33,7 @@
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
 from Phoenix.Conf import Config
-from Phoenix.Library import Validate
-from Phoenix.Models import UserMapper, KeyMapper, HookMapper, Key, Hook
-from sqlalchemy import Column, String, Integer, ForeignKey, and_
+from sqlalchemy import Column, String, Integer, and_
 from sqlalchemy.ext.declarative import declarative_base
 from git import Repo
 from shutil import rmtree, move
@@ -63,22 +61,29 @@ Base = declarative_base()
 class Repository(Base):
     __tablename__ = "repository"
     id = Column(Integer, primary_key=True)
-    uid = Column(Integer, nullable=False, ForeignKey("user.id"))
+    uid = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
     path = Column(String, nullable=False)
     hash = Column(String, nullable=False)
     
     def __init__(self, uid, name, path=None, hash=None):
+        from Phoenix.Library import Validate
         if Validate.user(uid):
             self.uid = uid
         else:
             raise Exception()
         self.name = name
-        self.path = path if path else self._sanitizePath()
+        self.setPath(path)
         self.hash = hash
     
     def __repr__(self):
         return "<Repository('%s', '%s', '%s', '%s'>" % (self.uid, self.name, self.path, self.hash)
+
+    def setPath(self, path):
+        path = path if path else self._sanitizePath()
+        if path.find(".git") == -1:
+            path += ".git"
+        self.path = path
 
     def save(self):
         hooks = False
@@ -90,7 +95,7 @@ class Repository(Base):
             self._checkChanges(RepositoryMapper.findById(self.id))
             
         sess = Config.getSession()
-        sess.save(self)
+        sess.add(self)
         sess.commit()
         
         if hooks:
@@ -103,32 +108,38 @@ class Repository(Base):
         for hook in self.getHooks():
             hook.delete()
         sess = Config.getSession()
-        sess.delete(self)
+        sess.delete(sess.query(Repository).get(self.id))
         sess.commit()
         
     def getFullpath(self):
         return path.join(Config.get("phoenix", "repository_dir"), self.hash)
         
     def createHook(self, hook, command):
+        from Phoenix.Models import Hook
         hook = Hook(self.id, hook, command)
         hook.save()
         return hook
         
     def createKey(self, key):
+        from Phoenix.Models import Key
         key = Key(self.uid, self.id, key)
         key.save()
         return key
         
     def getKeys(self):
+        from Phoenix.Models import KeyMapper
         return KeyMapper.findByRid(self.id)
     
     def getHooks(self):
+        from Phoenix.Models import HookMapper
         return HookMapper.findByRid(self.id)
     
     def getUser(self):
+        from Phoenix.Models import UserMapper
         return UserMapper.findById(self.uid)
         
     def getHooksByName(self, hook):
+        from Phoenix.Models import HookMapper
         return HookMapper.findByRidAndHook(self.id, hook)
         
     def _remove(self):
@@ -140,7 +151,7 @@ class Repository(Base):
 
     def _hashPath(self):
         m = sha1()
-        m.update(path + datetime.now().isoformat())
+        m.update(self.path + datetime.now().isoformat())
         self.hash = m.hexdigest()
         
     def _checkChanges(self, old):
@@ -174,7 +185,7 @@ class RepositoryMapper(object):
         return sess.query(Repository).filter(and_(
             Repository.name == name,
             Repository.uid == uid
-        ))
+        )).first()
 
     @classmethod
     def findByPath(cls, uid, path):
@@ -182,4 +193,4 @@ class RepositoryMapper(object):
         return sess.query(Repository).filter(and_(
             Repository.uid == uid,
             Repository.path == path
-        ))
+        )).first()

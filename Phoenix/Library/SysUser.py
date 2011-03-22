@@ -35,7 +35,7 @@ from Phoenix.Conf import logging
 from pwd import getpwnam
 from subprocess import Popen
 from socket import gethostname
-from os.environ import get
+import os
 
 class SysUser():
     
@@ -57,7 +57,7 @@ class SysUser():
     
     @classmethod
     def getUser(cls):
-        return get("USERNAME")
+        return os.environ.get("USERNAME")
     
     @classmethod
     def getEmail(cls):

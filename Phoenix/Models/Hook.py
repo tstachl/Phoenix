@@ -33,8 +33,7 @@
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
 from Phoenix.Conf import Config
-from Phoenix.Library import Validate
-from sqlalchemy import Column, String, Integer, ForeignKey, and_
+from sqlalchemy import Column, String, Integer, and_
 from sqlalchemy.ext.declarative import declarative_base
 
 """----------------------------------------------------------------------------
@@ -56,11 +55,12 @@ Base = declarative_base()
 class Hook(Base):
     __tablename__ = "hook"
     id = Column(Integer, primary_key=True)
-    rid = Column(Integer, nullable=False, ForeignKey("repository.id"))
+    rid = Column(Integer, nullable=False)
     hook = Column(String, nullable=False)
     command = Column(String, nullable=False)
     
     def __init__(self, rid, hook, command):
+        from Phoenix.Library import Validate
         if not Validate.repository(rid):
             raise HookException("Repository with id `%s' doesn't exist." % rid)
         
@@ -81,7 +81,7 @@ class Hook(Base):
         
     def delete(self):
         sess = Config.getSession()
-        sess.delete(self)
+        sess.delete(sess.query(Hook).get(self.id))
         sess.commit()
 
 class HookMapper(object):

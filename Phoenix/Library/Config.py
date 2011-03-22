@@ -48,7 +48,7 @@ class Config(object):
     def getSession(cls):
         if not cls.get("SESSION"):
             from sqlalchemy.orm import sessionmaker
-            cls.__dict__["SESSION"] = sessionmaker(bind=cls.getEngine())
+            cls.SESSION = sessionmaker(bind=cls.getEngine())
         return (cls.get("SESSION"))()
     
     @classmethod
@@ -56,7 +56,7 @@ class Config(object):
         if not cls.get("ENGINE"):
             from sqlalchemy import create_engine
             echo = True if Config.get("phoenix", "loglevel") == "DEBUG" else False
-            cls.__dict__["ENGINE"] = create_engine(cls.get("phoenix", "sql_connect"), echo=echo)
+            cls.ENGINE = create_engine(cls.get("phoenix", "sql_connect"), echo=echo)
         return cls.get("ENGINE")
 
     @classmethod
