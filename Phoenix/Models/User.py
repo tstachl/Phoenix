@@ -34,6 +34,7 @@
 from Phoenix import Exception
 from Phoenix.Conf import Config
 from sqlalchemy import Column, String, Integer
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
 """----------------------------------------------------------------------------
@@ -58,6 +59,10 @@ class User(Base):
     username = Column(String, nullable=False)
     email = Column(String, nullable=False)
     name = Column(String, nullable=True)
+    repositories = relationship("Repository", backref="user")
+    keys = relationship("Key", backref="user")
+    groups = relationship("Group", secondary="user_group", backref="user")
+    rules = relationship("Rule", backref="user")
     
     def __init__(self, username, email, name=None):
         from Phoenix.Library import Validate
@@ -138,3 +143,4 @@ class UserMapper(object):
         sess = Config.getSession()
         return sess.query(User).filter(User.username == username).first()
     
+from Phoenix.Models import Repository, Key, Group, Rule

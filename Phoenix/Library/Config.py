@@ -52,11 +52,12 @@ class Config(object):
         return (cls.get("SESSION"))()
     
     @classmethod
-    def getEngine(cls):
+    def getEngine(cls, sql_connect=False):
         if not cls.get("ENGINE"):
             from sqlalchemy import create_engine
             echo = True if Config.get("phoenix", "loglevel") == "DEBUG" else False
-            cls.ENGINE = create_engine(cls.get("phoenix", "sql_connect"), echo=echo)
+            sql_connect = "sqlite:///:memory:" if sql_connect else cls.get("phoenix", "sql_connect")
+            cls.ENGINE = create_engine(sql_connect, echo=echo)
         return cls.get("ENGINE")
 
     @classmethod

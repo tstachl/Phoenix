@@ -33,7 +33,8 @@
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
 from Phoenix.Conf import Config
-from sqlalchemy import Column, String, Integer, and_
+from sqlalchemy import Column, String, Integer, ForeignKey, and_
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from git import Repo
 from shutil import rmtree, move
@@ -61,10 +62,13 @@ Base = declarative_base()
 class Repository(Base):
     __tablename__ = "repository"
     id = Column(Integer, primary_key=True)
-    uid = Column(Integer, nullable=False)
+    uid = Column(Integer, ForeignKey("user.id"), nullable=False)
     name = Column(String, nullable=False)
     path = Column(String, nullable=False)
     hash = Column(String, nullable=False)
+    rules = relationship("Rule", backref="repository")
+    keys = relationship("Key", backref="repository")
+    hooks = relationship("Hook", backref="repository")
     
     def __init__(self, uid, name, path=None, hash=None):
         from Phoenix.Library import Validate
@@ -86,11 +90,11 @@ class Repository(Base):
         self.path = path
 
     def save(self):
-        hooks = False
+        new = False
         if not self.id:
+            new = True
             self._hashPath()
-            Repo.init(self.getFullpath(), mkdir=True, bare=True)
-            hooks = True
+            self._createRepository()
         else:        
             self._checkChanges(RepositoryMapper.findById(self.id))
             
@@ -98,7 +102,8 @@ class Repository(Base):
         sess.add(self)
         sess.commit()
         
-        if hooks:
+        if new:
+            self.createRule(".*", ".*", "CRUD")
             self._addHooks()
     
     def delete(self):
@@ -126,6 +131,12 @@ class Repository(Base):
         key.save()
         return key
         
+    def createRule(self, tag, branch, privilege):
+        from Phoenix.Models import Rule
+        rule = Rule(self.id, tag, branch, privilege, self.uid)
+        rule.save()
+        return rule
+        
     def getKeys(self):
         from Phoenix.Models import KeyMapper
         return KeyMapper.findByRid(self.id)
@@ -141,9 +152,6 @@ class Repository(Base):
     def getHooksByName(self, hook):
         from Phoenix.Models import HookMapper
         return HookMapper.findByRidAndHook(self.id, hook)
-        
-    def _remove(self):
-        rmtree(self.getFullpath())
 
     def _sanitizePath(self):
         valid = "-_%s%s" % (ascii_letters, digits)
@@ -154,18 +162,31 @@ class Repository(Base):
         m.update(self.path + datetime.now().isoformat())
         self.hash = m.hexdigest()
         
-    def _checkChanges(self, old):
-        if not old.path == self.path:
-            self._hashPath()
-            move(old.getFullpath(), self.getFullpath())
+    def _createRepository(self):
+#        Repo.init(self.getFullpath(), mkdir=True, bare=True)
+        pass
+        
+    def _remove(self):
+#        rmtree(self.getFullpath())
+        pass
             
     def _addHooks(self):
-        hooks = path.join(Config.get("ABS_PATH"), Config.get("phoenix", "hook_dir"))
-        for f in listdir(hooks):
-            t = Template(open(path.join(hooks, f), "r").read())
-            open(path.join(self.getFullpath(), "hooks", f), "w").write(t.substitute(repo=self.id))
-            system("chmod +x " + path.join(self.getFullpath(), "hooks", f))
-            remove(path.join(self.getFullpath(), "hooks", f + ".sample"))
+#        hooks = path.join(Config.get("ABS_PATH"), Config.get("phoenix", "hook_dir"))
+#        for f in listdir(hooks):
+#            t = Template(open(path.join(hooks, f), "r").read())
+#            open(path.join(self.getFullpath(), "hooks", f), "w").write(t.substitute(repo=self.id))
+#            system("chmod +x " + path.join(self.getFullpath(), "hooks", f))
+#            remove(path.join(self.getFullpath(), "hooks", f + ".sample"))
+        pass
+        
+    def _checkChanges(self, old):
+#        if not old.path == self.path:
+#            self._hashPath()
+#            move(old.getFullpath(), self.getFullpath())
+        pass
+
+from Phoenix.Models.Rule import Rule
+from Phoenix.Models import Rule, Key, Hook
 
 class RepositoryMapper(object):
     

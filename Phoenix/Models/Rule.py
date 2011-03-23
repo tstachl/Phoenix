@@ -24,7 +24,7 @@
     
     @copyright:    Copyright (c) 2011, w3agency.net
     @author:       Thomas Stachl <t.stachl@w3agency.net>
-    @since:        Mar 21, 2011
+    @since:        Mar 23, 2011
 
 """
 
@@ -33,7 +33,7 @@
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
 from Phoenix.Conf import Config
-from sqlalchemy import Column, String, Integer, ForeignKey, and_
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 
 """----------------------------------------------------------------------------
@@ -42,37 +42,50 @@ from sqlalchemy.ext.declarative import declarative_base
 class Exception(Exception):
     pass
 
-class HookException(Exception):
+class RuleException(Exception):
     pass
 
-class HookMapperException(Exception):
+class RuleMapperException(Exception):
     pass
 
 """----------------------------------------------------------------------------
                                 Class
 ----------------------------------------------------------------------------"""
 Base = declarative_base()
-class Hook(Base):
-    __tablename__ = "hook"
+class Rule(Base):
+    __tablename__ = "rule"
     id = Column(Integer, primary_key=True)
     rid = Column(Integer, ForeignKey("repository.id"), nullable=False)
-    hook = Column(String, nullable=False)
-    command = Column(String, nullable=False)
+    tag = Column(String, nullable=False)
+    branch = Column(String, nullable=False)
+    crud = Column(String, nullable=False)
+    uid = Column(Integer, ForeignKey("user.id"))
+    gid = Column(Integer, ForeignKey("group.id"))
+    pub = Column(Boolean)
     
-    def __init__(self, rid, hook, command):
+    def __init__(self, rid, tag, branch, crud, uid=None, gid=None, pub=False):
         from Phoenix.Library import Validate
         if not Validate.repository(rid):
-            raise HookException("Repository with id `%s' doesn't exist." % rid)
+            raise RuleException("Repository with id `%s' doesn't exist." % rid)
         
-        if not Validate.hookName(hook):
-            raise HookException("Hook with the name `%s' doesn't exist." % hook)
+        if uid and not Validate.user(uid):
+            raise RuleException("User with id `%s' doesn't exist." % uid)
+        
+        if gid and not Validate.group(gid):
+            raise RuleException("Group with id `%s' doesn't exist." % gid)
         
         self.rid = rid
-        self.hook = hook
-        self.command = command
+        self.tag = tag
+        self.branch = branch
+        self.crud = crud
+        self.uid = uid
+        self.gid = gid
+        self.pub = pub
     
     def __repr__(self):
-        return "<Hook('%s', '%s', '%s'>" % (self.rid, self.hook, self.command)
+        return "<Rule('%s', '%s', '%s', '%s', '%s', '%s', '%s'>" % (self.rid, self.tag, self.branch,
+                                                                    self.crud, self.uid, self.gid,
+                                                                    self.pub)
     
     def save(self):
         sess = Config.getSession()
@@ -81,24 +94,17 @@ class Hook(Base):
         
     def delete(self):
         sess = Config.getSession()
-        sess.delete(sess.query(Hook).get(self.id))
+        sess.delete(sess.query(Rule).get(self.id))
         sess.commit()
 
-class HookMapper(object):
+class RuleMapper(object):
     @classmethod
     def findById(cls, id):
         sess = Config.getSession()
-        return sess.query(Hook).get(id)
+        return sess.query(Rule).get(id)
         
     @classmethod
     def findByRid(cls, rid):
         sess = Config.getSession()
-        return sess.query(Hook).filter(Hook.rid == rid).all()
+        return sess.query(Rule).filter(Rule.rid == rid).all()
     
-    @classmethod
-    def findByRidAndHook(cls, rid, hook):
-        sess = Config.getSession()
-        return sess.query(Hook).filter(and_(
-            Hook.rid == rid,
-            Hook.hook == hook
-        )).all()

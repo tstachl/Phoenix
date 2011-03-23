@@ -24,16 +24,52 @@
     
     @copyright:    Copyright (c) 2011, w3agency.net
     @author:       Thomas Stachl <t.stachl@w3agency.net>
-    @since:        Mar 21, 2011
+    @since:        Mar 23, 2011
+
+"""
+
+"""
+
+    Access Control Test Case
+    ===========================================================================
+    Purpose:       This test case has to try and gain access to repositories on
+                   defined rules.
+    Prereq:        Database
+    Test Data:     
+    Steps:         Steps to carry out the test.
+    Notes:         Notes
+    Questions:     Questions
+    ===========================================================================
 
 """
 
 """----------------------------------------------------------------------------
                                 Imports
 ----------------------------------------------------------------------------"""
-from Phoenix.Models.User import User, UserMapper
-from Phoenix.Models.Group import Group, GroupMapper
-from Phoenix.Models.Repository import Repository, RepositoryMapper
-from Phoenix.Models.Key import Key, KeyMapper
-from Phoenix.Models.Hook import Hook, HookMapper
-from Phoenix.Models.Rule import Rule, RuleMapper
+from Phoenix.Tests import Db
+import unittest
+
+"""----------------------------------------------------------------------------
+                                TestCase
+----------------------------------------------------------------------------"""
+class TestOwner(unittest.TestCase):
+
+
+    def setUp(self):
+        self.owner = Db.User("owner", "owner@example.com", "Repository Owner")
+        self.owner.save()
+        self.owner.createRepository("OwnerRepository", "owner.git")
+
+    def tearDown(self):
+        self.owner.delete()
+
+
+    def testName(self):
+        print self.owner.repositories
+
+"""----------------------------------------------------------------------------
+                                EntryPoint
+----------------------------------------------------------------------------"""
+if __name__ == "__main__":
+    #import sys;sys.argv = ['', 'Test.testName']
+    unittest.main()

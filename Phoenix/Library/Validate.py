@@ -85,6 +85,20 @@ class Validate(object):
         if HookMapper.findById(hid):
             return True
         return False
+    
+    @classmethod
+    def rule(cls, ruid):
+        from Phoenix.Models import RuleMapper
+        if RuleMapper.findById(ruid):
+            return True
+        return False
+    
+    @classmethod
+    def group(cls, gid):
+        from Phoenix.Models import GroupMapper
+        if GroupMapper.findById(gid):
+            return True
+        return False
 
     @classmethod
     def hookName(cls, name):

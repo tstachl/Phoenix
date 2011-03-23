@@ -24,16 +24,8 @@
     
     @copyright:    Copyright (c) 2011, w3agency.net
     @author:       Thomas Stachl <t.stachl@w3agency.net>
-    @since:        Mar 21, 2011
+    @since:        Mar 22, 2011
 
 """
 
-"""----------------------------------------------------------------------------
-                                Imports
-----------------------------------------------------------------------------"""
-from Phoenix.Models.User import User, UserMapper
-from Phoenix.Models.Group import Group, GroupMapper
-from Phoenix.Models.Repository import Repository, RepositoryMapper
-from Phoenix.Models.Key import Key, KeyMapper
-from Phoenix.Models.Hook import Hook, HookMapper
-from Phoenix.Models.Rule import Rule, RuleMapper
+

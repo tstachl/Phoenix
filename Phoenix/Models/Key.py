@@ -34,7 +34,7 @@
 from Phoenix import Exception
 from Phoenix.Conf import Config, logging
 from Phoenix.Library import File
-from sqlalchemy import Column, Integer
+from sqlalchemy import Column, Integer, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 
 """----------------------------------------------------------------------------
@@ -56,8 +56,8 @@ Base = declarative_base()
 class Key(Base):
     __tablename__ = "key"
     id = Column(Integer, primary_key=True)
-    uid = Column(Integer, nullable=False)
-    rid = Column(Integer)
+    uid = Column(Integer, ForeignKey("user.id"), nullable=False)
+    rid = Column(Integer, ForeignKey("repository.id"))
     
     def __init__(self, uid, rid=None, key=None):
         from Phoenix.Library import Validate
@@ -115,16 +115,19 @@ class Key(Base):
         return RepositoryMapper.findById(self.rid)
         
     def _prepareKey(self):
-        tmp = """command="phoenix serve --key-id %s",""" % self.id
-        tmp += "no-port-forwarding,no-x11-forwarding,no-agent-forwarding %s" % self.key
-        return tmp
+#        tmp = """command="phoenix serve --key-id %s",""" % self.id
+#        tmp += "no-port-forwarding,no-x11-forwarding,no-agent-forwarding %s" % self.key
+#        return tmp
+        pass
     
     def _append(self):
-        File.appendToFile(Config.get("phoenix", "authorized_keys"), self._prepareKey())
+#        File.appendToFile(Config.get("phoenix", "authorized_keys"), self._prepareKey())
+        pass
         
     def _remove(self):
-        logging.info("Removing key `%s' from authorized_keys ..." % self.id)
-        File.removeLine(Config.get("phoenix", "authorized_keys"), "--key-id %s" % self.id)    
+#        logging.info("Removing key `%s' from authorized_keys ..." % self.id)
+#        File.removeLine(Config.get("phoenix", "authorized_keys"), "--key-id %s" % self.id)
+        pass
 
 class KeyMapper(object):
     @classmethod
