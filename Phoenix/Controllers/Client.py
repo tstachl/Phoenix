@@ -69,13 +69,6 @@ class Client(Console):
         runhook.add_argument("-r", "--repository-id", help="The repository to run it for.")
         runhook.add_argument("-a", "--arguments", help="The original arguments.")
         
-        uploadpack = subparsers.add_parser("upload-pack")
-        uploadpack.add_argument("-a", "--advertise-refs", action="store_const", const=True)
-        uploadpack.add_argument("-r", "--stateless-rpc", action="store_const", const=True)
-        uploadpack.add_argument("-s", "--strict", action="store_const", const=True)
-        uploadpack.add_argument("-t", "--timeout")
-        uploadpack.add_argument("dir")
-        
         authorize = subparsers.add_parser("authorize", help="This action will only be called from Phoenix repositories.")
 
     def serve(self):
@@ -123,5 +116,3 @@ class Client(Console):
             logging.info("Running command `%s' ..." % hook.command + arguments)
             Popen(split(str(hook.command + arguments)))
             
-    def uploadpack(self):
-        raise RuntimeError(self.args.dir)
