@@ -81,7 +81,7 @@ class Repository(SQLObject):
         self._SO_set_hash(value)
 
     def _sanitizePath(self, value):
-        valid = "-_%s%s" % (ascii_letters, digits)
+        valid = "-_.%s%s" % (ascii_letters, digits)
         path = "".join(c for c in value.replace(" ", "-") if c in valid)
         return path if path.find(".git") != -1 else path + ".git"
         

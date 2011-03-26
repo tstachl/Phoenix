@@ -67,7 +67,7 @@ class Admin(Console):
         init.add_argument("--repository-dir", help="The path where git repositories are stored [$base-dir/repositories]", default="repositories")
         init.add_argument("--tarball-dir", help="The path where generated tarballs are stored [$base-dir/tarballs]", default="tarballs")
         init.add_argument("-s", "--sql-connect", help="The connection string for the database to use [sqlite:///$BASE_DIR/phoenix.db]")
-        init.add_argument("-d", "--develop-me", action="store_const", const=True, help="If this flag is set, the source code of this application will initialize itself as a git repository and will become developable")
+        init.add_argument("-d", "--admin-repo", action="store_const", const=True, help="If this flag is set, we will create an admin repo to manage everything.")
 
         adduser = subparsers.add_parser("adduser", help="Add a new user to the database")
         adduser.add_argument("-u", "--username", help="The new users username", required=True)
@@ -108,8 +108,6 @@ class Admin(Console):
         removehook = subparsers.add_parser("removehook", help="Remove a hook from a repository")
         removehook.add_argument("-i", "--hook-id", help="The id of the hook to remove", required=True)
 
-        debug = subparsers.add_parser("debug")
-
     def init(self):
         if Config.get("phoenix", "initialized") == "True":
             raise AdminException("Already initialized.")
@@ -121,12 +119,12 @@ class Admin(Console):
         tar = path.join(base, self.args.tarball_dir)
         ssh = path.join(base, ".ssh")
         auth_keys = path.join(ssh, "authorized_keys")
-        dev = self.args.develop_me
+        admin_repo = self.args.admin_repo
         email = self.args.admin_email
         name = self.args.admin_name
         username = self.args.admin_username
-        sql = self.args.sql_connect or "sqlite://%s" % path.join(Config.get("ABS_PATH"), "data/phoenix.db")
-        
+        sql = self.args.sql_connect or "sqlite://%s" % path.join(base, "phoenix.db")
+                
         logging.info("Checking for permission to write the config file ...")
         if not File.writePermission(Config.get("CONF_FILE")):
             raise AdminException("You don't have permission to write the config file `%s' ..." % Config.get("CONF_FILE"))
@@ -139,15 +137,18 @@ class Admin(Console):
         else:
             raise AdminException("The user `%s' already exists." % user)
         
+        logging.info("Saving SQL connection string `%s' ..." % sql)
+        Config.set("phoenix", "sql_connect", sql)
+        Config.set("phoenix", "initialized", True)
+        Config.set("phoenix", "authorized_keys", auth_keys)
+        
         __import__("os").setgid(__import__("pwd").getpwnam(user).pw_gid)
         __import__("os").setuid(__import__("pwd").getpwnam(user).pw_uid)
-        
-        logging.info("Checking for permission to write the config file as `%s' ...")
+                
+        logging.info("Checking for permission to write the config file as `%s' ..." % user)
         if not File.writePermission(Config.get("CONF_FILE")):
             raise AdminException("You don't have permission to write the config file `%s' ..." % Config.get("CONF_FILE"))
         
-        logging.info("Saving SQL connection string `%s' ..." % sql)
-        Config.set("phoenix", "sql_connect", sql)
         
         from sqlobject import connectionForURI, sqlhub
         connection = connectionForURI(Config.get("phoenix", "sql_connect"))
@@ -158,17 +159,14 @@ class Admin(Console):
 
         logging.info("Creating `%s' ..." % auth_keys)
         File.touch(auth_keys)
-        Config.set("phoenix", "authorized_keys", auth_keys)
         
         logging.info("Saving admin user information `%s' and `%s' in database ..." % (name, email))
         admin = Member(username=username, email=email, name=name)
         
-        if dev:
+        if admin_repo:
             logging.info("Initializing development repository at `%s/phoenix.git' ..." % repo)
-            Config.set("phoenix", "develop_me", dev)
             admin.addRepository("Phoenix Server Management", "phoenix.git")
         
-        Config.set("phoenix", "initialized", True)
         print "Done."
         
     def adduser(self):
