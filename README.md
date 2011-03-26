@@ -51,7 +51,7 @@ Phoenix has been tested on Ubuntu 10.04 and Ubuntu 10.10 with Python 2.6.
           --repository-dir [repositories]
           --tarball-dir [tarballs
           -s --sql-connect [$base/phonix.db]
-          -d --develop-me [NO]
+          -d --admin-repo [NO]
     adduser
         * -u --username
         * -e --email
