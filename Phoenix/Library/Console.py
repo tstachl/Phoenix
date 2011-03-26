@@ -78,7 +78,9 @@ class Console(object):
             exit()
         
         try:
-            getattr(self, self.args.action)()
+            action = self.args.action.replace("-", "")
+            if hasattr(self, action):
+                getattr(self, action)()
         except:
             logging.debug(format_exc())
             print_exc(0)

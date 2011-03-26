@@ -33,7 +33,7 @@
 ----------------------------------------------------------------------------"""
 from Phoenix.Conf import Config, logging
 from Phoenix.Library import Console, Validate
-from Phoenix.Models import KeyMapper, UserMapper, RepositoryMapper
+from Phoenix.Models import Key, Member, Repository
 from socket import gethostname
 from subprocess import Popen
 from shlex import split
@@ -69,54 +69,53 @@ class Client(Console):
         runhook.add_argument("-r", "--repository-id", help="The repository to run it for.")
         runhook.add_argument("-a", "--arguments", help="The original arguments.")
         
+        uploadpack = subparsers.add_parser("upload-pack")
+        uploadpack.add_argument("-a", "--advertise-refs", action="store_const", const=True)
+        uploadpack.add_argument("-r", "--stateless-rpc", action="store_const", const=True)
+        uploadpack.add_argument("-s", "--strict", action="store_const", const=True)
+        uploadpack.add_argument("-t", "--timeout")
+        uploadpack.add_argument("dir")
+        
+        authorize = subparsers.add_parser("authorize", help="This action will only be called from Phoenix repositories.")
+
     def serve(self):
         logging.disable(logging.INFO)
         
-        key = KeyMapper.findById(self.args.key_id)
-        userKey = key.getUser()
-        repoKey = key.getRepository()
+        key = Key.get(self.args.key_id)
+        member = key.getMember()
         
         if not os.environ.get("SSH_ORIGINAL_COMMAND"):
-            print "Hi %s!" % userKey.username
+            print "Hi %s!" % member.username
             print "You've successfully authenticated, but %s does not provide shell access." % Config.get("phoenix", "app_name", "Phoenix")
             print "Use the following command to clone a repository:"
-            print "    > git clone git@%s:%s/repository.git" % (gethostname(), userKey.username)
+            print "    > git clone git@%s:%s/repository.git" % (gethostname(), member.username)
             return False
         else:
-            (command, path) = os.environ.get("SSH_ORIGINAL_COMMAND").replace("'", "").split()
+            (command, fullpath) = os.environ.get("SSH_ORIGINAL_COMMAND").replace("'", "").split()
             if not Validate.gitcommand(command):
                 raise Exception(command)
-                print "Hi %s!" % userKey.username
+                print "Hi %s!" % member.username
                 print "You've successfully authenticated, but %s does not provide shell access." % Config.get("phoenix", "app_name", "Phoenix")
                 print "Use the following command to clone a repository:"
-                print "    > git clone git@%s:%s/repository.git" % (gethostname(), userKey.username)
+                print "    > git clone git@%s:%s/repository.git" % (gethostname(), member.username)
                 return False
-            
-        (username, repopath) = path.split("/")
-        user = UserMapper.findByUsername(username)
-        repo = user.getRepositoryByPath(repopath)
-        
-        if not repo:
-            logging.error("Repository `%s' not found but requested ..." % path)
+        (username, repopath) = fullpath.split("/")
+        try:
+            owner = Member.selectBy(username=username)[0]
+            repo = Repository.selectBy(member=owner, path=repopath)[0]
+        except IndexError:
+            logging.error("Repository `%s' not found but requested ..." % fullpath)
             raise ClientException("You are not allowed in this repository!")
-        
-        if repoKey:
-            if repoKey.id == repo.id:
-                __import__("os").execvp("git", ["git", "shell", "-c", "%s '%s'" % (command, repo.getFullpath())])
-            else:
-                logging.error("User `%s' tried to access repository `%s' ..." % (userKey.id, repo.id))
-                raise ClientException("You are not allowed in this repository!")
+        if repo.hasAccess(member, "master", "", "U" if command == "git-receive-pack" else "R"):
+            __import__("os").execvp("git", ["git", "shell", "-c", "%s '%s'" % (command, repo.getFullpath())])
         else:
-            if userKey.id == repo.uid:
-                __import__("os").execvp("git", ["git", "shell", "-c", "%s '%s'" % (command, repo.getFullpath())])
-            else:
-                logging.error("User `%s' tried to access repository `%s' ..." % (userKey.id, repo.id))
-                raise ClientException("You are not allowed in this repository!")
+            logging.error("User `%s' tried to access repository `%s' ..." % (member.id, repo.id))
+            raise ClientException("You are not allowed in this repository!")
     
     def runhook(self):   
         logging.disable(logging.INFO)     
         logging.info("Defining hook, repo and arguments ...")
-        repo = RepositoryMapper.findById(self.args.repository_id)
+        repo = Repository.get(self.args.repository_id)
         arguments = " " + self.args.arguments if self.args.arguments else ""
         
         logging.info("Looking up all hooks for repository `%s' and hook `%s' ..." % (repo.id, self.args.hook))
@@ -124,3 +123,5 @@ class Client(Console):
             logging.info("Running command `%s' ..." % hook.command + arguments)
             Popen(split(str(hook.command + arguments)))
             
+    def uploadpack(self):
+        raise RuntimeError(self.args.dir)

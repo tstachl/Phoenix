@@ -31,9 +31,16 @@
 """----------------------------------------------------------------------------
                                 Imports
 ----------------------------------------------------------------------------"""
-from Phoenix.Models.User import User, UserMapper
-from Phoenix.Models.Group import Group, GroupMapper
-from Phoenix.Models.Repository import Repository, RepositoryMapper
-from Phoenix.Models.Key import Key, KeyMapper
-from Phoenix.Models.Hook import Hook, HookMapper
-from Phoenix.Models.Rule import Rule, RuleMapper
+from Phoenix.Models.MemberModel import Member
+from Phoenix.Models.RoleModel import Role
+from Phoenix.Models.RepositoryModel import Repository
+from Phoenix.Models.PrivilegeModel import Privilege
+from Phoenix.Models.HookModel import Hook
+from Phoenix.Models.KeyModel import Key
+
+Member.createTable(ifNotExists=True)
+Role.createTable(ifNotExists=True)
+Repository.createTable(ifNotExists=True)
+Privilege.createTable(ifNotExists=True)
+Hook.createTable(ifNotExists=True)
+Key.createTable(ifNotExists=True)

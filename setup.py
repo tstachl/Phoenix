@@ -52,8 +52,7 @@ setup(
     version=VERSION,
     packages=find_packages(),
     
-    
-    install_requires=["GitPython >= 0.3.1-beta2", "argparse >= 1.1", "SQLAlchemy >= 0.6.6"],
+    install_requires=["GitPython >= 0.3.1-beta2", "argparse >= 1.1", "SQLObject >= 1.0.0b2dev-r4370"],
     
     author="Phoenix, w3agency.net",
     author_email="phoenix@w3agency.net",

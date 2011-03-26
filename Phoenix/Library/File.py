@@ -49,12 +49,14 @@ class File():
         f.close()
         
     @classmethod
-    def removeLine(cls, filename, regex):
-        lines = []
+    def replaceLine(cls, filename, regex, newline=None):
+        lines = []; cls.touch(filename)
         for line in file(filename).readlines():
             if not search(regex, line):
                 lines.append(line)
-        file(filename, "w").writelines(lines)
+        if newline: lines.append(newline)
+        if len(lines) > 0: file(filename, "w").writelines(lines)
+        else: open(filename, "w").close()
         
     @classmethod
     def writePermission(cls, filename):
@@ -64,3 +66,11 @@ class File():
         except:
             pass
         return False
+
+    @classmethod
+    def extractKey(cls, filename, id):
+        key = ""; add = len("no-agent-forwarding") + 1
+        for line in file(filename, "r").readlines():
+            if search("--key-id %s" % id, line):
+                key = line[line.find("no-agent-forwarding") + add:]
+        return key

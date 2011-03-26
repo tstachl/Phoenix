@@ -59,44 +59,44 @@ class Validate(object):
         return False
 
     @classmethod
-    def user(cls, uid):
-        from Phoenix.Models import UserMapper
-        if UserMapper.findById(uid):
+    def member(cls, id):
+        from Phoenix.Models import Member
+        if Member.get(id):
             return True
         return False
 
     @classmethod
-    def repository(cls, rid):
-        from Phoenix.Models import RepositoryMapper
-        if RepositoryMapper.findById(rid):
+    def repository(cls, id):
+        from Phoenix.Models import Repository
+        if Repository.get(id):
             return True
         return False
     
     @classmethod
-    def key(cls, kid):
-        from Phoenix.Models import KeyMapper
-        if KeyMapper.findById(kid):
+    def key(cls, id):
+        from Phoenix.Models import Key
+        if Key.get(id):
             return True
         return False
     
     @classmethod
-    def hook(cls, hid):
-        from Phoenix.Models import HookMapper
-        if HookMapper.findById(hid):
+    def hook(cls, id):
+        from Phoenix.Models import Hook
+        if Hook.get(id):
             return True
         return False
     
     @classmethod
-    def rule(cls, ruid):
-        from Phoenix.Models import RuleMapper
-        if RuleMapper.findById(ruid):
+    def privilege(cls, id):
+        from Phoenix.Models import Privilege
+        if Privilege.get(id):
             return True
         return False
     
     @classmethod
-    def group(cls, gid):
-        from Phoenix.Models import GroupMapper
-        if GroupMapper.findById(gid):
+    def role(cls, gid):
+        from Phoenix.Models import Role
+        if Role.get(gid):
             return True
         return False
 

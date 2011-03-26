@@ -32,10 +32,8 @@
                                 Imports
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
-from Phoenix.Conf import Config
-from sqlalchemy import Column, String, Integer
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlobject import (SQLObject, StringCol, RelatedJoin, MultipleJoin,
+                       ForeignKey, events)
 
 """----------------------------------------------------------------------------
                                 Exception
@@ -43,47 +41,21 @@ from sqlalchemy.ext.declarative import declarative_base
 class Exception(Exception):
     pass
 
-class GroupException(Exception):
-    pass
-
-class GroupMapperException(Exception):
+class RoleException(Exception):
     pass
 
 """----------------------------------------------------------------------------
                                 Class
 ----------------------------------------------------------------------------"""
-Base = declarative_base()
-class Group(Base):
-    __tablename__ = "group"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    rules = relationship("Rule", backref="group")
-    
-    def __init__(self, name):
-        from Phoenix.Library import Validate
-        if not Validate.username(name):
-            raise GroupException("The name `%s' is not allowed for a group-name." % name)
-        
-        self.name = name
-    
-    def __repr__(self):
-        return "<Group('%s'>" % self.name
-    
-    def save(self):
-        sess = Config.getSession()
-        sess.add(self)
-        sess.commit()
-        
-    def delete(self):
-        sess = Config.getSession()
-        sess.delete(sess.query(Group).get(self.id))
-        sess.commit()
-
-from Phoenix.Models import Rule
-
-class GroupMapper(object):
+class Role(SQLObject):
+    name = StringCol(length=255)
+    member = ForeignKey("Member")
+    members = RelatedJoin("Member")
+    privileges = MultipleJoin("Privilege")
     
     @classmethod
-    def findById(cls, id):
-        sess = Config.getSession()
-        return sess.query(Group).get(id)
+    def _beforedestroy(cls, role, *a):
+        for member in role.members:
+            member.removeRole(role)
+        
+events.listen(Role._beforedestroy, Role, events.RowDestroySignal)

@@ -24,52 +24,30 @@
     
     @copyright:    Copyright (c) 2011, w3agency.net
     @author:       Thomas Stachl <t.stachl@w3agency.net>
-    @since:        Mar 23, 2011
-
-"""
-
-"""
-
-    Access Control Test Case
-    ===========================================================================
-    Purpose:       This test case has to try and gain access to repositories on
-                   defined rules.
-    Prereq:        Database
-    Test Data:     
-    Steps:         Steps to carry out the test.
-    Notes:         Notes
-    Questions:     Questions
-    ===========================================================================
+    @since:        Mar 21, 2011
 
 """
 
 """----------------------------------------------------------------------------
                                 Imports
 ----------------------------------------------------------------------------"""
-from Phoenix.Tests import Db
-import unittest
+from Phoenix import Exception
+from sqlobject import SQLObject, ForeignKey, StringCol
 
 """----------------------------------------------------------------------------
-                                TestCase
+                                Exception
 ----------------------------------------------------------------------------"""
-class TestOwner(unittest.TestCase):
+class Exception(Exception):
+    pass
 
-
-    def setUp(self):
-        self.owner = Db.User("owner", "owner@example.com", "Repository Owner")
-        self.owner.save()
-        self.owner.createRepository("OwnerRepository", "owner.git")
-
-    def tearDown(self):
-        self.owner.delete()
-
-
-    def testName(self):
-        print self.owner.repositories
+class HookException(Exception):
+    pass
 
 """----------------------------------------------------------------------------
-                                EntryPoint
+                                Class
 ----------------------------------------------------------------------------"""
-if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
+class Hook(SQLObject):
+    repository = ForeignKey("Repository")
+    hook = StringCol(length=18)
+    command = StringCol(length=255)
+

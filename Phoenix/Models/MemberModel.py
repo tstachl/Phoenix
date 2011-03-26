@@ -32,9 +32,7 @@
                                 Imports
 ----------------------------------------------------------------------------"""
 from Phoenix import Exception
-from Phoenix.Conf import Config
-from sqlalchemy import Column, String, Integer, ForeignKey, and_
-from sqlalchemy.ext.declarative import declarative_base
+from sqlobject import SQLObject, StringCol, RelatedJoin, MultipleJoin, events
 
 """----------------------------------------------------------------------------
                                 Exception
@@ -42,63 +40,63 @@ from sqlalchemy.ext.declarative import declarative_base
 class Exception(Exception):
     pass
 
-class HookException(Exception):
-    pass
-
-class HookMapperException(Exception):
+class MemberException(Exception):
     pass
 
 """----------------------------------------------------------------------------
                                 Class
 ----------------------------------------------------------------------------"""
-Base = declarative_base()
-class Hook(Base):
-    __tablename__ = "hook"
-    id = Column(Integer, primary_key=True)
-    rid = Column(Integer, ForeignKey("repository.id"), nullable=False)
-    hook = Column(String, nullable=False)
-    command = Column(String, nullable=False)
+class Member(SQLObject):
+    username = StringCol(alternateID=True, length=20)
+    email = StringCol(alternateID=True, length=254)
+    name = StringCol(length=255, default=None)
+    ownedroles = MultipleJoin("Role")
+    roles = RelatedJoin("Role")
+    repositories = MultipleJoin("Repository")
+    privileges = MultipleJoin("Privilege")
+    keys = MultipleJoin("Key")
     
-    def __init__(self, rid, hook, command):
-        from Phoenix.Library import Validate
-        if not Validate.repository(rid):
-            raise HookException("Repository with id `%s' doesn't exist." % rid)
-        
-        if not Validate.hookName(hook):
-            raise HookException("Hook with the name `%s' doesn't exist." % hook)
-        
-        self.rid = rid
-        self.hook = hook
-        self.command = command
+    def addRepository(self, name, path=None):
+        from Phoenix.Models import Repository
+        repo = Repository(member=self, name=name, path=path)
+        return repo
     
-    def __repr__(self):
-        return "<Hook('%s', '%s', '%s'>" % (self.rid, self.hook, self.command)
+    def addRole(self, name):
+        from Phoenix.Models import Role
+        role = Role(name=name, member=self)
+        return role
     
-    def save(self):
-        sess = Config.getSession()
-        sess.add(self)
-        sess.commit()
+    def addKey(self, key):
+        from Phoenix.Models import Key
+        key = Key(member=self, pubkey=key)
+        return key
+    
+    def removeKey(self, key):
+        key.destroySelf()
         
-    def delete(self):
-        sess = Config.getSession()
-        sess.delete(sess.query(Hook).get(self.id))
-        sess.commit()
+    def repositoryByName(self, name):
+        from Phoenix.Models import Repository
+        try:
+            return Repository.selectBy(member=self, name=name)[0]
+        except IndexError:
+            return None
+    
+    def repositoryByPath(self, path):
+        from Phoenix.Models import Repository
+        try:
+            return Repository.selectBy(member=self, path=path)[0]
+        except IndexError:
+            return None
 
-class HookMapper(object):
     @classmethod
-    def findById(cls, id):
-        sess = Config.getSession()
-        return sess.query(Hook).get(id)
+    def _beforedestroy(cls, member, *a):
+        for role in member.ownedroles:
+            role.destroySelf()
         
-    @classmethod
-    def findByRid(cls, rid):
-        sess = Config.getSession()
-        return sess.query(Hook).filter(Hook.rid == rid).all()
-    
-    @classmethod
-    def findByRidAndHook(cls, rid, hook):
-        sess = Config.getSession()
-        return sess.query(Hook).filter(and_(
-            Hook.rid == rid,
-            Hook.hook == hook
-        )).all()
+        for repository in member.repositories:
+            repository.destroySelf()
+            
+        for key in member.keys:
+            key.destroySelf()
+        
+events.listen(Member._beforedestroy, Member, events.RowDestroySignal)

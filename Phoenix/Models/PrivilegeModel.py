@@ -24,28 +24,33 @@
     
     @copyright:    Copyright (c) 2011, w3agency.net
     @author:       Thomas Stachl <t.stachl@w3agency.net>
-    @since:        Mar 21, 2011
+    @since:        Mar 23, 2011
 
 """
 
 """----------------------------------------------------------------------------
                                 Imports
 ----------------------------------------------------------------------------"""
-import logging
-from os import path
-from Phoenix.Library import Config
-from sqlobject import connectionForURI, sqlhub
+from Phoenix import Exception
+from sqlobject import SQLObject, ForeignKey, StringCol, BoolCol
 
 """----------------------------------------------------------------------------
-                                Definitions
+                                Exception
 ----------------------------------------------------------------------------"""
-Config.ABS_PATH = path.realpath(path.dirname(__file__) + "/../")
-Config.CONF_FILE = path.join(Config.get("ABS_PATH"), "Conf/phoenix.cfg")
-connection_string = Config.get("phoenix", "sql_connect") or "sqlite:/:memory:"
-connection = connectionForURI(connection_string)
-sqlhub.processConnection = connection
+class Exception(Exception):
+    pass
+
+class PrivilegeException(Exception):
+    pass
 
 """----------------------------------------------------------------------------
-                                Logging
+                                Class
 ----------------------------------------------------------------------------"""
-logging.basicConfig(level=getattr(logging, Config.get("phoenix", "loglevel", "WARN")))
+class Privilege(SQLObject):
+    repository = ForeignKey("Repository")
+    tag = StringCol(length=255)
+    branch = StringCol(length=255)
+    crud = StringCol(length=4)
+    member = ForeignKey("Member")
+    role = ForeignKey("Role")
+    public = BoolCol(default=False)

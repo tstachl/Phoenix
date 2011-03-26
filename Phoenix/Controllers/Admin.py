@@ -33,7 +33,7 @@
 ----------------------------------------------------------------------------"""
 from Phoenix.Conf import Config, logging
 from Phoenix.Library import Console, SysUser, File
-from Phoenix.Models import User, UserMapper, KeyMapper, HookMapper
+from Phoenix.Models import Member, Key, Hook
 from os import path, mkdir
 
 """----------------------------------------------------------------------------
@@ -83,9 +83,7 @@ class Admin(Console):
         addkey = subparsers.add_parser("addkey", help="Add a new key to a user or a deploy key to a repository")
         addkey.add_argument("-e", "--email", help="The email of the user the key should be added to")
         addkey.add_argument("-u", "--username", help="The username of the user the key should be added to")
-        addkey.add_argument("-n", "--repository-name", help="The name of the repository the key should be added to")
-        addkey.add_argument("-p", "--repository-path", help="Optional, sometimes the path is shorter than the name")
-
+        
         addhook = subparsers.add_parser("addhook", help="Add a hook to a repository.")
         addhook.add_argument("-k", "--hook", help="The hook you want to add", required=True)
         addhook.add_argument("-c", "--command", help="The command to execute on this hook", required=True)
@@ -110,6 +108,8 @@ class Admin(Console):
         removehook = subparsers.add_parser("removehook", help="Remove a hook from a repository")
         removehook.add_argument("-i", "--hook-id", help="The id of the hook to remove", required=True)
 
+        debug = subparsers.add_parser("debug")
+
     def init(self):
         if Config.get("phoenix", "initialized") == "True":
             raise AdminException("Already initialized.")
@@ -125,7 +125,7 @@ class Admin(Console):
         email = self.args.admin_email
         name = self.args.admin_name
         username = self.args.admin_username
-        sql = self.args.sql_connect or "sqlite:///%s" % path.join(Config.get("ABS_PATH"), "data/phoenix.db")
+        sql = self.args.sql_connect or "sqlite://%s" % path.join(Config.get("ABS_PATH"), "data/phoenix.db")
         
         logging.info("Checking for permission to write the config file ...")
         if not File.writePermission(Config.get("CONF_FILE")):
@@ -149,8 +149,11 @@ class Admin(Console):
         logging.info("Saving SQL connection string `%s' ..." % sql)
         Config.set("phoenix", "sql_connect", sql)
         
-        self._createDatabase()
-            
+        from sqlobject import connectionForURI, sqlhub
+        connection = connectionForURI(Config.get("phoenix", "sql_connect"))
+        sqlhub.processConnection = connection
+        
+        self._sqlChanges()
         self._createDirectoryStructure(repo, tar, ssh)
 
         logging.info("Creating `%s' ..." % auth_keys)
@@ -158,13 +161,12 @@ class Admin(Console):
         Config.set("phoenix", "authorized_keys", auth_keys)
         
         logging.info("Saving admin user information `%s' and `%s' in database ..." % (name, email))
-        admin = User(username, email, name)
-        admin.save()
+        admin = Member(username=username, email=email, name=name)
         
         if dev:
             logging.info("Initializing development repository at `%s/phoenix.git' ..." % repo)
             Config.set("phoenix", "develop_me", dev)
-            admin.createRepository("Phoenix Server Management", "phoenix")
+            admin.addRepository("Phoenix Server Management", "phoenix.git")
         
         Config.set("phoenix", "initialized", True)
         print "Done."
@@ -175,11 +177,10 @@ class Admin(Console):
         name = self.args.name
         email = self.args.email
         
-        dummy = self._getUserByUsernameOrEmail(username, email)
+        dummy = self._getMemberByUsernameOrEmail(username, email)
         
         logging.info("Creating and saving the new user ...")
-        user = User(username, email, name)
-        user.save()
+        Member(username=username, email=email, name=name)
         
         print "Done."
         
@@ -190,15 +191,15 @@ class Admin(Console):
         name = self.args.repository_name
         path = self.args.repository_path
         
-        user = self._getUserByUsernameOrEmail(username, email, True)
-        dummy = self._getRepositoryByNameOrPath(user, name, path)
+        member = self._getMemberByUsernameOrEmail(username, email, True)
+        dummy = self._getRepositoryByNameOrPath(member, name, path)
 
         logging.info("Changing to the git user ...")
         __import__("os").setgid(__import__("pwd").getpwnam(Config.get("phoenix", "user")).pw_gid)
         __import__("os").setuid(__import__("pwd").getpwnam(Config.get("phoenix", "user")).pw_uid)
         
         logging.info("Creating and saving the new repository ...")
-        user.createRepository(name, path)
+        member.addRepository(name, path)
         
         print "Done."
         
@@ -211,15 +212,11 @@ class Admin(Console):
         logging.info("Define username, email and repository ...")
         email = self.args.email
         username = self.args.username
-        name = self.args.repository_name
-        path = self.args.repository_path
         
-        user = self._getUserByUsernameOrEmail(username, email, True)
-        repo = self._getRepositoryByNameOrPath(user, name, path)
+        member = self._getMemberByUsernameOrEmail(username, email, True)
         
         logging.info("Save new key in database ...")
-        if repo: repo.createKey(key)
-        else: user.createKey(key)
+        member.addKey(key)
         
         print "Done."
         
@@ -232,11 +229,11 @@ class Admin(Console):
         hook = self.args.hook
         command = self.args.command
         
-        user = self._getUserByUsernameOrEmail(username, email, True)
-        repo = self._getRepositoryByNameOrPath(user, name, path, True)
+        member = self._getMemberByUsernameOrEmail(username, email, True)
+        repo = self._getRepositoryByNameOrPath(member, name, path, True)
         
         logging.info("Save new hook in database ...")
-        repo.createHook(hook, command)
+        repo.addHook(hook, command)
         
         print "Done."
         
@@ -245,10 +242,10 @@ class Admin(Console):
         email = self.args.email
         username = self.args.username
         
-        user = self._getUserByUsernameOrEmail(username, email, True)
+        member = self._getMemberByUsernameOrEmail(username, email, True)
         
         logging.info("Removing the user from the database ...")
-        user.delete()
+        member.destroySelf()
         
         print "Done."
         
@@ -259,11 +256,11 @@ class Admin(Console):
         name = self.args.repository_name
         path = self.args.repository_path
 
-        user = self._getUserByUsernameOrEmail(username, email, True)
-        repo = self._getRepositoryByNameOrPath(user, name, path, True)
+        member = self._getMemberByUsernameOrEmail(username, email, True)
+        repo = self._getRepositoryByNameOrPath(member, name, path, True)
         
         logging.info("Removing the repository ...")
-        repo.delete()
+        repo.destroySelf()
         
         print "Done."
         
@@ -272,13 +269,13 @@ class Admin(Console):
         id = self.args.key_id
         
         logging.info("Checking if the key exists ...")
-        key = KeyMapper.findById(id)
+        key = Key.get(id)
         
         if not key:
             raise Exception("The key with the id `%s' does not exits." % id)
                 
         logging.info("Removing the key from the database ...")
-        key.delete()
+        key.destroySelf()
         
         print "Done."
         
@@ -287,39 +284,39 @@ class Admin(Console):
         id = self.args.hook_id
         
         logging.info("Checking if hook exists ...")
-        hook = HookMapper.findById(id)
+        hook = Hook.get(id)
         
         if not hook:
             raise Exception("The hook with the id `%s' does not exist." % id)
         
         logging.info("Removing the hook from the database ...")
-        hook.delete()
+        hook.destroySelf()
         
         print "Done."
         
-    def _getUserByUsernameOrEmail(self, username, email, must=False):        
+    def _getMemberByUsernameOrEmail(self, username, email, must=False):        
         logging.info("Trying to find the user by username or email ...")
-        user = None
-        if username:
-            user = UserMapper.findByUsername(username)
-        if email:
-            user = UserMapper.findByEmail(email)
-                
-        logging.info("Checking if we have a user ...")
-        if must and not user:
-            raise AdminException("The user can not be found (username: `%s', email: `%s')" % (username, email))
-        if not must and user:
-            raise AdminException("The user `%s' with email `%s' already exists." % (user.username, user.email))
+        member = None
+        try:
+            if username:
+                member = Member.selectBy(username=username)[0]
+            if email:
+                member = Member.selectBy(email=email)[0]
+        except IndexError:
+            if must and not member:
+                raise AdminException("The user can not be found (username: `%s', email: `%s')" % (username, email))
+        if not must and member:
+            raise AdminException("The user `%s' with email `%s' already exists." % (member.username, member.email))
         
-        return user
+        return member
     
-    def _getRepositoryByNameOrPath(self, user, name, path, must=False):
+    def _getRepositoryByNameOrPath(self, member, name, path, must=False):
         repo = None
         logging.info("Trying to find a repository by name or path ...")
         if name:
-            repo = user.getRepositoryByName(name)
+            repo = member.repositoryByName(name)
         if path:
-            repo = user.getRepositoryByPath(path)
+            repo = member.repositoryByPath(path)
             
         if must and not repo:
             raise AdminException("Repository with name `%s' or path `%s' can not be found." % (name, path))
@@ -349,32 +346,16 @@ class Admin(Console):
         else:
             logging.warning("The folder `%s' already exists." % ssh)
         Config.set("phoenix", "ssh_dir", ssh)
+        
+    def _sqlChanges(self):
+        from Phoenix.Models import Privilege, Repository, Role
+        Member.createTable(ifNotExists=True)
+        Role.createTable(ifNotExists=True)
+        Repository.createTable(ifNotExists=True)
+        Privilege.createTable(ifNotExists=True)
+        Hook.createTable(ifNotExists=True)
+        Key.createTable(ifNotExists=True)
 
-    def _createDatabase(self):
-        from sqlalchemy import MetaData, Table, Column, Integer, String
-        metadata = MetaData()
-        Table("user", metadata,
-            Column("id", Integer, primary_key=True),
-            Column("username", String, nullable=False),
-            Column("name", String, nullable=True),
-            Column("email", String, nullable=False),
-        )
-        Table("repository", metadata,
-            Column("id", Integer, primary_key=True),
-            Column("uid", Integer, nullable=False),
-            Column("name", String, nullable=False),
-            Column("path", String, nullable=False),
-            Column("hash", String, nullable=False),
-        )
-        Table("key", metadata,
-            Column("id", Integer, primary_key=True),
-            Column("uid", Integer, nullable=False),
-            Column("rid", Integer),
-        )
-        Table("hook", metadata,
-            Column("id", Integer, primary_key=True),
-            Column("rid", Integer, nullable=False),
-            Column("hook", String, nullable=False),
-            Column("command", String, nullable=False),
-        )
-        metadata.create_all(Config.getEngine())
+    def debug(self):
+        print Config.get("ABS_PATH")
+        print Config.get("phoenix", "hook_dir")

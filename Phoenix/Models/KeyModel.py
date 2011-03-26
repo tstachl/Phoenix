@@ -31,21 +31,62 @@
 """----------------------------------------------------------------------------
                                 Imports
 ----------------------------------------------------------------------------"""
-import logging
-from os import path
-from Phoenix.Library import Config
-from sqlobject import connectionForURI, sqlhub
+from Phoenix import Exception
+from sqlobject import SQLObject, ForeignKey, events
+from Phoenix.Library import File
+from Phoenix.Conf import Config
 
 """----------------------------------------------------------------------------
-                                Definitions
+                                Exception
 ----------------------------------------------------------------------------"""
-Config.ABS_PATH = path.realpath(path.dirname(__file__) + "/../")
-Config.CONF_FILE = path.join(Config.get("ABS_PATH"), "Conf/phoenix.cfg")
-connection_string = Config.get("phoenix", "sql_connect") or "sqlite:/:memory:"
-connection = connectionForURI(connection_string)
-sqlhub.processConnection = connection
+class Exception(Exception):
+    pass
+
+class KeyException(Exception):
+    pass
 
 """----------------------------------------------------------------------------
-                                Logging
+                                Class
 ----------------------------------------------------------------------------"""
-logging.basicConfig(level=getattr(logging, Config.get("phoenix", "loglevel", "WARN")))
+class Key(SQLObject):
+    member = ForeignKey("Member")
+    initialized = False
+
+    def _init(self, *args, **kw):
+        SQLObject._init(self, *args, **kw)
+        if hasattr(self, "keystring"):
+            Key._writeKey(self.id, self.keystring)
+            del self.keystring
+        self.initialized = True
+
+    def _set_pubkey(self, value):
+        if value and not value.strip():
+            raise KeyException("Provided key is not valid.")
+        if self.initialized:
+            Key._writeKey(self.id, value)
+        else:
+            self.keystring = value
+    
+    def _get_pubkey(self):
+        return File.extractKey(Config.get("phoenix", "authorized_keys"), self.id)
+    
+    def getMember(self):
+        from Phoenix.Models import Member
+        return Member.get(self.member.id)
+    
+    @classmethod
+    def _writeKey(cls, id, key):
+        File.replaceLine(Config.get("phoenix", "authorized_keys"),
+                         "--key-id %s" % id, cls._prepareKey(id, key))
+    
+    @classmethod
+    def _prepareKey(cls, id, key):
+        tmp = """command="phoenix serve --key-id %s",""" % id
+        tmp += "no-port-forwarding,no-x11-forwarding,no-agent-forwarding %s" % key
+        return tmp
+
+    @classmethod
+    def _beforedestroy(cls, key, *a):
+        File.replaceLine(Config.get("phoenix", "authorized_keys"), "--key-id %s" % key.id)
+        
+events.listen(Key._beforedestroy, Key, events.RowDestroySignal)
